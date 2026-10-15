@@ -37,6 +37,7 @@ Depends: $deps
 Description: Kilix terminal media player based on mpv
  Separately named player with the Kitty terminal resize fix.
 EOF
+chmod -R a+rX "$package"
 stem="kilix-mpv_${version}_${arch}"
 dpkg-deb --root-owner-group --build "$package" "$out/$stem.deb"
 git -C "$root" archive --format=tar --prefix="kilix-mpv-$version/" "$revision" | gzip -n > "$out/kilix-mpv_$version.source.tar.gz"
