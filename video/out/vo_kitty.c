@@ -135,6 +135,7 @@ static void free_bufs(struct vo* vo)
     talloc_free(p->frame);
     talloc_free(p->output);
     talloc_free(p->cmd.start);
+    p->cmd = (bstr){0};
 
     if (p->opts.use_shm) {
         close_shm(p);

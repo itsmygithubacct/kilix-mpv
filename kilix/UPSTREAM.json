@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/mpv-player/mpv.git",
+  "tag": "v0.40.0",
+  "commit": "e48ac7ce08462f5e33af6ef9deeac6fa87eef01e",
+  "stack_target": "next release (provisionally 0.2.2); not RC6",
+  "patches": ["Reset the freed Kitty command buffer before resize reuse"]
+}

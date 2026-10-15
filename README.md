@@ -1,3 +1,8 @@
+# kilix-mpv fork
+
+See [Kilix build, packaging, and maintenance](kilix/README.md).
+The upstream documentation follows.
+
 ![mpv logo](https://raw.githubusercontent.com/mpv-player/mpv.io/master/source/images/mpv-logo-128.png)
 
 # mpv

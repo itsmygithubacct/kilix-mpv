@@ -1,0 +1,23 @@
+name: Kilix terminal package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  debian13:
+    runs-on: ubuntu-latest
+    container: debian:13
+    steps:
+      - name: Build dependencies
+        run: |
+          apt-get update
+          apt-get install -y ca-certificates git build-essential meson ninja-build pkg-config dpkg-dev python3 ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libplacebo-dev libass-dev libluajit-5.1-dev libpulse-dev
+      - uses: actions/checkout@v4
+      - name: Package and terminal regression checks
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash kilix/build-package.sh /tmp/kilix-mpv-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kilix-mpv-debian13
+          path: /tmp/kilix-mpv-dist/*
