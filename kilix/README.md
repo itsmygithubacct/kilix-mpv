@@ -47,8 +47,10 @@ The presenter adapts `kitty-framebuffer`'s synchronized updates, two named image
 IDs, targeted deletion and bounded shared-memory approach. It uses mpv's own
 clock and scaler instead of adding the library's second presentation thread.
 The compatible image layer is `z=-1`; the framebuffer library's deeper negative
-layer was invisible in the tested engine. Existing terminal images are never
-globally deleted. Private objects are cleaned up on normal exit.
+layer was invisible in the tested engine. Frame replacement and exit delete only
+owned image IDs. The existing alternate-screen and config-clear behavior still
+applies: use `--vo-kitty-config-clear=no` to avoid clearing the screen on
+reconfiguration. Private objects are cleaned up on normal exit.
 
 Local playback can use `--vo-kitty-use-shm=yes` to bypass base64 and PTY pixel
 copies. Three randomly named, owner-only objects hold immutable frames; terminal
