@@ -38,6 +38,7 @@
 #include "input/keycodes.h"
 #include "misc/ctype.h"
 #include "terminal.h"
+#include "terminal-mouse.h"
 
 // Timeout in ms after which the (normally ambiguous) ESC key is detected.
 #define ESC_TIMEOUT 100
@@ -204,9 +205,47 @@ static void skip_buf(struct termbuf *b, unsigned int count)
 
 static struct termbuf buf;
 
+static void terminal_mouse_position(struct input_ctx *ctx, double x, double y)
+{
+    int rows = 25, cols = 80, width = 720, height = 450;
+    terminal_get_size2(&rows, &cols, &width, &height);
+    int old_x, old_y, hover;
+    mp_input_get_mouse_pos(ctx, &old_x, &old_y, &hover);
+    if (!hover)
+        mp_input_put_key(ctx, MP_KEY_MOUSE_ENTER);
+    mp_input_set_mouse_pos(ctx, (MPCLAMP(x, 1, cols) - 0.5) * width / cols,
+                          (MPCLAMP(y, 1, rows) - 0.5) * height / rows, false);
+}
+
 static void process_input(struct input_ctx *input_ctx, bool timeout)
 {
     while (buf.len) {
+        if (buf.len >= 3 && memcmp(buf.b, "\033[<", 3) == 0) {
+            struct terminal_mouse_event event;
+            int count = terminal_mouse_parse(buf.b, buf.len, &event);
+            if (!count)
+                goto read_more;
+            if (count > 0) {
+                terminal_mouse_position(input_ctx, event.x, event.y);
+                unsigned b = event.button;
+                int mods = ((b & 4) ? MP_KEY_MODIFIER_SHIFT : 0) |
+                           ((b & 8) ? MP_KEY_MODIFIER_ALT : 0) |
+                           ((b & 16) ? MP_KEY_MODIFIER_CTRL : 0);
+                if (b & 64) {
+                    if (!event.release)
+                        mp_input_put_key(input_ctx, mods | (MP_WHEEL_UP + (b & 3)));
+                } else if (!(b & 32) && !(b & 128)) {
+                    if ((b & 3) == 3) {
+                        mp_input_put_key(input_ctx, MP_INPUT_RELEASE_ALL);
+                    } else {
+                        mp_input_put_key(input_ctx, mods | (MP_MBTN_LEFT + (b & 3)) |
+                            (event.release ? MP_KEY_STATE_UP : MP_KEY_STATE_DOWN));
+                    }
+                }
+            }
+            skip_buf(&buf, count < 0 ? -count : count);
+            continue;
+        }
         // Lone ESC is ambiguous, so accept it only after a timeout.
         if (timeout &&
             ((buf.len == 1 && buf.b[0] == '\033') ||
@@ -299,14 +338,7 @@ static void process_input(struct input_ctx *input_ctx, bool timeout)
         if ((match->type == ENTRY_TYPE_MOUSE_BUTTON ||
              match->type == ENTRY_TYPE_MOUSE_MOVE) && seq_len >= 6)
         {
-            int num_rows        = 80;
-            int num_cols        = 25;
-            int total_px_width  = 0;
-            int total_px_height = 0;
-            terminal_get_size2(&num_rows, &num_cols, &total_px_width, &total_px_height);
-            mp_input_set_mouse_pos(input_ctx,
-                (buf.b[4] - 32.5) * (total_px_width / num_cols),
-                (buf.b[5] - 32.5) * (total_px_height / num_rows), false);
+            terminal_mouse_position(input_ctx, buf.b[4] - 32, buf.b[5] - 32);
         }
         if (match->type != ENTRY_TYPE_MOUSE_MOVE)
             mp_input_put_key(input_ctx, buf.mods | match->mpkey);
@@ -579,14 +611,14 @@ void terminal_get_size(int *w, int *h)
 void terminal_get_size2(int *rows, int *cols, int *px_width, int *px_height)
 {
     struct winsize ws;
-    if (ioctl(tty_in, TIOCGWINSZ, &ws) < 0 || !ws.ws_row || !ws.ws_col
-                                           || !ws.ws_xpixel || !ws.ws_ypixel)
+    if (ioctl(tty_in, TIOCGWINSZ, &ws) < 0 || !ws.ws_row || !ws.ws_col)
         return;
 
     *rows = ws.ws_row;
     *cols = ws.ws_col;
-    *px_width = ws.ws_xpixel;
-    *px_height = ws.ws_ypixel;
+    // Match kitty-framebuffer's conservative fallback when a PTY omits pixels.
+    *px_width = ws.ws_xpixel ? ws.ws_xpixel : ws.ws_col * 9;
+    *px_height = ws.ws_ypixel ? ws.ws_ypixel : ws.ws_row * 18;
 }
 
 void terminal_set_mouse_input(bool enable)

@@ -14,10 +14,13 @@ mkdir -p "$out"
 work="$(mktemp -d "$out/.build.XXXXXXXX")"
 trap 'rm -rf -- "$work"' EXIT
 meson setup "$work/build" "$root" --prefix=/usr/local --buildtype=release \
-  -Dauto_features=disabled -Dgl=disabled -Dlibmpv=false -Dlua=luajit -Dpulse=enabled
+  -Dauto_features=disabled -Dzlib=enabled -Dgl=disabled -Dlibmpv=false -Dlua=luajit -Dpulse=enabled
 ninja -C "$work/build" -j "${KILIX_MPV_BUILD_JOBS:-2}"
 meson install -C "$work/build" --no-rebuild --destdir "$work/stage"
+cc -std=c11 -Wall -Wextra -Werror -I "$root" "$root/kilix/test-mouse.c" -o "$work/test-mouse"
+"$work/test-mouse"
 python3 "$root/kilix/test-terminal.py" "$work/stage/usr/local/bin/mpv"
+python3 -B "$root/kilix/test-protocol.py" "$work/stage/usr/local/bin/mpv"
 package="$work/package"
 mkdir -p "$package/usr/bin" "$package/usr/share/doc/kilix-mpv" "$package/DEBIAN" "$work/debian"
 install -m 755 "$work/stage/usr/local/bin/mpv" "$package/usr/bin/kilix-mpv"
@@ -35,7 +38,8 @@ Priority: optional
 Maintainer: itsmygithubacct <itsmygithubacct@users.noreply.github.com>
 Depends: $deps
 Description: Kilix terminal media player based on mpv
- Separately named player with the Kitty terminal resize fix.
+ Separately named player with lossless adaptive terminal transport,
+ bounded shared memory, and terminal input and resize fixes.
 EOF
 chmod -R a+rX "$package"
 stem="kilix-mpv_${version}_${arch}"

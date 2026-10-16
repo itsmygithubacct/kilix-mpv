@@ -3,5 +3,11 @@
   "tag": "v0.40.0",
   "commit": "e48ac7ce08462f5e33af6ef9deeac6fa87eef01e",
   "stack_target": "next release (provisionally 0.2.2); not RC6",
-  "patches": ["Reset the freed Kitty command buffer before resize reuse"]
+  "patches": [
+    "Reset freed buffers and resize paused video through geometry polling",
+    "Adaptive lossless zlib transport and exact base64 packet termination",
+    "Synchronized presentation with two owned image IDs and targeted cleanup",
+    "Bounded immutable shared-memory ring with terminal unlink acknowledgment",
+    "Bounded SGR mouse parsing and letterbox coordinate mapping"
+  ]
 }

@@ -11,7 +11,7 @@ jobs:
       - name: Build dependencies
         run: |
           apt-get update
-          apt-get install -y ca-certificates git build-essential meson ninja-build pkg-config dpkg-dev python3 ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libplacebo-dev libass-dev libluajit-5.1-dev libpulse-dev
+          apt-get install -y ca-certificates git build-essential meson ninja-build pkg-config dpkg-dev python3 ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libplacebo-dev libass-dev libluajit-5.1-dev libpulse-dev zlib1g-dev
       - uses: actions/checkout@v4
       - name: Package and terminal regression checks
         run: |

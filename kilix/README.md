@@ -2,8 +2,8 @@
 
 A narrowly maintained mpv fork for `kilix video`, targeted at the next
 Plebian-OS release (provisionally 0.2.2), not RC6. The upstream version and
-commit are recorded in UPSTREAM.json. The initial fork resets a freed Kitty
-command buffer on resize; upstream decoding and controls remain intact.
+commit are recorded in UPSTREAM.json. Version `0.40.0+kilix.2` improves terminal
+transport, input, and presentation while retaining mpv's decoder and playback clock.
 
 The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
@@ -14,7 +14,7 @@ named player. Running it directly retains upstream mpv's configuration behavior.
 On Debian 13, install `build-essential meson ninja-build pkg-config git dpkg-dev
 python3 ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev
 libswresample-dev libswscale-dev libplacebo-dev libass-dev libluajit-5.1-dev
-libpulse-dev` and their package dependencies. Then, from a clean checkout:
+libpulse-dev zlib1g-dev` and their package dependencies. Then, from a clean checkout:
 
 ```sh
 bash kilix/build-package.sh /absolute/output/directory
@@ -27,11 +27,71 @@ source archive, metadata and SHA256SUMS. Dependencies are derived from the binar
 using dpkg-shlibdeps. The output directory must be outside the checkout.
 `KILIX_MPV_BUILD_JOBS` controls parallel compilation (default 2).
 
-The tests exercise mouse input, resizing, seeking with the keyboard and normal
-exit. They do not prove visual seek-bar geometry or audio on every device. Full
-release acceptance still requires native visual/mouse/audio checks and a clean
+The tests exercise mouse actions, paused resizing, keyboard seek, tiny graphics
+packets, missing pixel geometry, bounded shared-memory backpressure and normal
+exit. Native visual/OSC checks are available separately. Full release acceptance
+still requires physical display/audio checks and a clean
 Debian image install. Package builds are ABI-specific; publish only after those
 checks, and pin both source commit and package checksum in the stack release.
+
+## Terminal transport and controls
+
+Inline RGB transport is lossless. By default a distributed 8 KiB sample decides
+whether zlib level 1 compression is worthwhile (sample must shrink below 70%).
+Incompressible footage stays raw, avoiding a full-frame compression pass.
+`--vo-kitty-compression=0` disables compression; levels 1–9 and
+`--vo-kitty-compression-threshold=1..100` are available for experiments.
+This changes the wire representation, not the scaled RGB pixels.
+
+The presenter adapts `kitty-framebuffer`'s synchronized updates, two named image
+IDs, targeted deletion and bounded shared-memory approach. It uses mpv's own
+clock and scaler instead of adding the library's second presentation thread.
+The compatible image layer is `z=-1`; the framebuffer library's deeper negative
+layer was invisible in the tested engine. Existing terminal images are never
+globally deleted. Private objects are cleaned up on normal exit.
+
+Local playback can use `--vo-kitty-use-shm=yes` to bypass base64 and PTY pixel
+copies. Three randomly named, owner-only objects hold immutable frames; terminal
+unlink acknowledges consumption. A busy ring skips a frame rather than
+overwriting unread pixels. Shared memory is opt-in: the terminal and player
+must share a POSIX shared-memory namespace. It cannot cross an SSH connection.
+The next-release host exposes this as `kilix video --transport shm FILE` and
+rejects known SSH/tmux sessions; default inline transport remains portable.
+
+SGR input supports large terminal coordinates, release, modifiers, wheel and
+motion, while retaining legacy X10 input. Mouse positions account for the
+cell-snapped letterbox origin. Coordinates still have cell precision. Paused
+video checks geometry every 100 ms; it redraws without waiting for playback.
+Use Kilix's native mouse cursor (`software_mouse_cursor none`, `mouse_hide_wait 0`).
+The host disables text status overlays and restores synchronized-update and
+mouse modes even after a player crash.
+
+## Repeatable measurements
+
+```sh
+python3 -B kilix/benchmark-terminal.py /path/to/candidate comparison.json \
+  --baseline /path/to/baseline --fixtures /path/to/fixtures
+python3 -B kilix/test-protocol.py /path/to/candidate
+cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I . \
+  kilix/test-mouse.c -o /tmp/kilix-mpv-test-mouse
+/tmp/kilix-mpv-test-mouse
+python3 -B kilix/test-native.py /path/to/candidate /path/to/kilix-engine \
+  /path/to/fixtures/pattern.mkv /path/to/native-evidence
+# Repeat the native check with --shm for local shared-memory transport.
+```
+
+The benchmark interleaves baseline and candidate across deterministic patterned
+and noisy clips at 640×360 and 1280×720, three repetitions by default. It decodes
+every graphics packet, validates byte count/base64/zlib and compares full RGB
+frame hashes (consecutive duplicate redraws are collapsed). It records wall and
+child CPU time, first frame, wire bytes, image lifetimes and protocol defects.
+Reported throughput includes the Python PTY consumer and is **not display FPS**.
+The native check uses a private Xvfb display, clicks the actual OSC before/after
+resize, verifies time-position changes, saves screenshots, and checks SHM cleanup.
+Requires Xvfb, xdotool and ImageMagick; it does not touch the caller's window.
+
+`resize-fix.patch` preserves the initial fork's historical minimal fix. The
+maintained source and `UPSTREAM.json` describe the current broader changes.
 
 ## Maintenance and distribution
 
