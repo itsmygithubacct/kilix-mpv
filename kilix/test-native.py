@@ -109,7 +109,14 @@ def main():
                     assert allow_error or reply['error'] == 'success', reply
                     return reply.get('data')
             raise RuntimeError('IPC closed')
-        def xdo(*items): return subprocess.check_output(['xdotool', *items], env=env, text=True).strip()
+        def wait_for(predicate):
+            deadline = time.monotonic() + 5
+            while not predicate():
+                if time.monotonic() >= deadline:
+                    raise AssertionError('native input/state did not arrive within five seconds')
+                time.sleep(.05)
+
+        def xdo(*items): return subprocess.check_output(['xdotool', *items], env=env, text=True, timeout=5).strip()
         def screenshot(name):
             path=private/(name+'.png')
             subprocess.run(['import','-display',display,'-window','root',str(path)],env=env,check=True)
@@ -146,10 +153,17 @@ def main():
             ox=round((width-pw)/2)+int((pw-d['w'])/2/cell_w)*cell_w
             oy=round((height-ph)/2)+int((ph-d['h'])/2/cell_h)*cell_h
             x={'play':20.5*vscale,'volume':d['w']-56.5*vscale,'fullscreen':d['w']-20.5*vscale,'seek':d['w']*.5}[name]
+            d['target_x'], d['target_y'] = x, d['h']-15*vscale
             return round(ox+x),round(oy+d['h']-15*vscale),d
+        def pointer_at(x, y):
+            mouse = command('get_property', 'mouse-pos')
+            # Window-grid centering can round the outside padding by one pixel.
+            return abs(mouse['x']-x) <= 2 and abs(mouse['y']-y) <= 2
+
         def click(name,width,height,button='1'):
             x,y,d=point(name,width,height)
-            xdo('mousemove','--window',window,str(x),str(y));time.sleep(.2)
+            xdo('mousemove','--window',window,str(x),str(y))
+            wait_for(lambda: pointer_at(d['target_x'], d['target_y']))
             mouse=command('get_property','mouse-pos')
             xdo('click',button);time.sleep(.3)
             return dict(name=name,x=x,y=y,mouse=mouse,osd=d)
@@ -160,25 +174,26 @@ def main():
             command('set_property','volume',60)
             record={'width':width,'height':height,'clicks':[]}
             record['clicks'].append(click('play',width,height))
-            assert command('get_property','pause') is False,record
+            wait_for(lambda: command('get_property','pause') is False)
             record['clicks'].append(click('play',width,height))
-            assert command('get_property','pause') is True,record
+            wait_for(lambda: command('get_property','pause') is True)
             record['clicks'].append(click('volume',width,height))
-            assert command('get_property','mute') is True,record
+            wait_for(lambda: command('get_property','mute') is True)
             # Exercise points near all four edges *inside* the drawn speaker
             # button. Cell rounding can move these into an adjacent hitbox.
             cx,cy,d=point('volume',width,height)
             for dx,dy in [(0,-11),(0,11),(-10,0),(10,0)]:
                 command('set_property','mute',False)
                 x=round(cx+dx*d['h']/720);y=round(cy+dy*d['h']/720)
-                xdo('mousemove','--window',window,str(x),str(y));time.sleep(.15)
+                xdo('mousemove','--window',window,str(x),str(y))
+                wait_for(lambda: pointer_at(d['target_x']+x-cx,d['target_y']+y-cy))
                 xdo('click','1');time.sleep(.2)
-                assert command('get_property','mute') is True, (width,height,x,y,command('get_property','mouse-pos'))
+                wait_for(lambda: command('get_property','mute') is True)
             record['clicks'].append(click('volume',width,height,'5'))
-            assert command('get_property','volume')<60,record
+            wait_for(lambda: command('get_property','volume') < 60)
             command('seek',1,'absolute+exact');time.sleep(.2)
             record['clicks'].append(click('seek',width,height))
-            assert command('get_property','time-pos')>10,record
+            wait_for(lambda: command('get_property','time-pos') > 10)
             # Real drag events exercise press/motion/release, not IPC seeking.
             x,y,_=point('seek',width,height)
             xdo('mousemove','--window',window,str(x-40),str(y));time.sleep(.1)
@@ -186,7 +201,7 @@ def main():
             left=command('get_property','time-pos')
             xdo('mousemove','--window',window,str(x+40),str(y));time.sleep(.2)
             xdo('mouseup','1');time.sleep(.2)
-            assert command('get_property','time-pos')>left+1,record
+            wait_for(lambda: command('get_property','time-pos') > left+1)
             screenshot(f'controls-{width}')
             results.append(record)
             print(json.dumps(record),flush=True)
