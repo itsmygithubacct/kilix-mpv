@@ -26,7 +26,8 @@ import zlib
 
 
 class Capture:
-    def __init__(self):
+    def __init__(self, acknowledge_shm=True):
+        self.acknowledge_shm = acknowledge_shm
         self.pending = b''
         self.payload = bytearray()
         self.headers = None
@@ -95,7 +96,8 @@ class Capture:
                     assert name.startswith('kilix-mpv-') and '/' not in name
                     path = Path('/dev/shm') / name
                     raw = path.read_bytes()
-                    path.unlink()  # terminal acknowledgment; allow slot reuse
+                    if self.acknowledge_shm:
+                        path.unlink()  # terminal acknowledgment; allow slot reuse
                 if self.headers.get(b'o') == b'z':
                     raw = zlib.decompress(raw)
                     self.compressed += 1

@@ -22,13 +22,13 @@ spec.loader.exec_module(benchmark)
 
 
 class Session:
-    def __init__(self, player, clip, root, options=(), capture=True):
+    def __init__(self, player, clip, root, options=(), acknowledge_shm=True):
         self.master, self.slave = pty.openpty()
         self.original = termios.tcgetattr(self.slave)
         self.resize(1200, 720)
         self.ipc = root / 'ipc.sock'
         self.ipc.unlink(missing_ok=True)
-        self.capture = benchmark.Capture() if capture else None
+        self.capture = benchmark.Capture(acknowledge_shm=acknowledge_shm)
         self.error = None
         self.tail = b''
         self.process = subprocess.Popen([
@@ -157,13 +157,17 @@ def main():
         print('PASS shared-memory acknowledgment/reuse and exact inline pixel equality', flush=True)
 
         # No terminal acknowledgment: the producer must cap outstanding objects at three.
-        with Session(player, clip, root, ['--vo-kitty-use-shm=yes'], capture=False) as session:
+        with Session(player, clip, root, ['--vo-kitty-use-shm=yes'], acknowledge_shm=False) as session:
             paths = lambda: list(Path('/dev/shm').glob(f'kilix-mpv-{session.process.pid}-*'))
-            session.wait(lambda: len(paths()) == 3)
+            # shm_open exposes the name before ftruncate/memcpy complete. Only
+            # the graphics command publishes a frame as ready for the reader.
+            session.wait(lambda: session.capture.frames == 3)
+            assert len(paths()) == 3
             first = {p.name: p.read_bytes() for p in paths()}
             session.resize(640, 360)
             time.sleep(.4)
             assert {p.name: p.read_bytes() for p in paths()} == first, 'unread frames overwritten'
+            assert session.capture.frames == 3, 'published beyond the unread ring'
         print('PASS shared-memory backpressure: three immutable slots, resize, exit cleanup', flush=True)
 
 
