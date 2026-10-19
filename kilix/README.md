@@ -12,6 +12,15 @@ The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
 named player. Running it directly retains upstream mpv's configuration behavior.
 
+The package also installs `kilix-video FILE`, the matching Kilix launcher with
+terminal recovery and a persistent warning/error panel. The first four distinct
+messages stay visible until exit; additional diagnostics are printed after the
+terminal is restored. `kilix-video --transport shm FILE` enables local shared
+memory. The launcher source revision and file hashes are pinned in `LAUNCHER.json`.
+Its GPL license and provenance are installed beside the player notices, and its
+exact source archive accompanies the package. `kilix video FILE` in the matching
+next-release host uses the same launcher.
+
 ## Build and check
 
 On Debian 13, install `build-essential meson ninja-build pkg-config git dpkg-dev
@@ -29,6 +38,9 @@ staged executable in private PTYs, and creates a Debian package, corresponding
 source archive, metadata and SHA256SUMS. Dependencies are derived from the binary
 using dpkg-shlibdeps. The output directory must be outside the checkout.
 `KILIX_MPV_BUILD_JOBS` controls parallel compilation (default 2).
+The build fetches the pinned launcher commit. For an offline build, set
+`KILIX_LAUNCHER_SOURCE` to a Git repository containing that commit; files are read
+from the pinned Git objects and verified against their hashes.
 
 The tests exercise mouse actions, paused resizing, keyboard seek, tiny graphics
 packets, missing pixel geometry, bounded shared-memory backpressure and normal

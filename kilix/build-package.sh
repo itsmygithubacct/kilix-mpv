@@ -26,6 +26,8 @@ mkdir -p "$package/usr/bin" "$package/usr/share/doc/kilix-mpv" "$package/DEBIAN"
 install -m 755 "$work/stage/usr/local/bin/mpv" "$package/usr/bin/kilix-mpv"
 cp "$root/Copyright" "$package/usr/share/doc/kilix-mpv/copyright"
 cp "$root/LICENSE.GPL" "$root/LICENSE.LGPL" "$root/kilix/UPSTREAM.json" "$package/usr/share/doc/kilix-mpv/"
+python3 "$root/kilix/package-launcher.py" "$root" "$work" "$package" "$out"
+launcher_revision="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$root/kilix/LAUNCHER.json")"
 printf 'Source: kilix-mpv\nSection: video\nPriority: optional\nMaintainer: itsmygithubacct <itsmygithubacct@users.noreply.github.com>\n\nPackage: kilix-mpv\nArchitecture: any\nDescription: Kilix terminal media player\n' > "$work/debian/control"
 deps="$(cd "$work" && dpkg-shlibdeps -O -e"$package/usr/bin/kilix-mpv" | sed -n 's/^shlibs:Depends=//p')"
 [[ -n $deps ]] || { echo 'could not derive runtime dependencies' >&2; exit 1; }
@@ -36,15 +38,16 @@ Architecture: $arch
 Section: video
 Priority: optional
 Maintainer: itsmygithubacct <itsmygithubacct@users.noreply.github.com>
-Depends: $deps
+Depends: python3, $deps
 Description: Kilix terminal media player based on mpv
  Separately named player with lossless adaptive terminal transport,
- bounded shared memory, and terminal input and resize fixes.
+ bounded shared memory, and terminal input and resize fixes. Includes the
+ kilix-video launcher with persistent diagnostics and terminal recovery.
 EOF
 chmod -R a+rX "$package"
 stem="kilix-mpv_${version}_${arch}"
 dpkg-deb --root-owner-group --build "$package" "$out/$stem.deb"
 git -C "$root" archive --format=tar --prefix="kilix-mpv-$version/" "$revision" | gzip -n > "$out/kilix-mpv_$version.source.tar.gz"
-printf '{"package":"kilix-mpv","version":"%s","source_commit":"%s","architecture":"%s","stack_target":"next release; not RC6"}\n' "$version" "$revision" "$arch" > "$out/$stem.json"
-(cd "$out" && sha256sum "$stem.deb" "kilix-mpv_$version.source.tar.gz" "$stem.json" > SHA256SUMS)
+printf '{"package":"kilix-mpv","version":"%s","source_commit":"%s","launcher_commit":"%s","architecture":"%s","stack_target":"next release; not RC6"}\n' "$version" "$revision" "$launcher_revision" "$arch" > "$out/$stem.json"
+(cd "$out" && sha256sum "$stem.deb" "kilix-mpv_$version.source.tar.gz" "kilix-launcher_$launcher_revision.source.tar.gz" "$stem.json" > SHA256SUMS)
 printf 'Package and source: %s\n' "$out"
