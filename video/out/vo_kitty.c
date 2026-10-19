@@ -108,7 +108,7 @@ struct priv {
     int     buffer_size, output_size, output_length;
     uint8_t *compressed;
     size_t compressed_capacity;
-    bool frame_compressed, frame_ready;
+    bool frame_compressed, frame_ready, clear_on_flip;
     unsigned image_ids[2], image_index;
     bool has_image;
     int     shm_fd;
@@ -215,9 +215,9 @@ static int reconfig(struct vo *vo, struct mp_image_params *params)
     struct priv *p = vo->priv;
 
     vo->want_redraw = true;
-    delete_images(vo);
-    if (p->opts.config_clear)
-        write_str(TERM_ESC_CLEAR_SCREEN);
+    // Keep the visible frame (including diagnostics) until its replacement is
+    // ready. Clearing here can leave a paused terminal blank during reconfigure.
+    p->clear_on_flip = p->opts.config_clear;
 
     // Release using the OLD mapping size before updating geometry.
     free_bufs(vo);
@@ -394,6 +394,8 @@ static void flip_page(struct vo *vo)
     // Follow kitty-framebuffer's synchronized double-buffer presentation:
     // complete the new image before deleting only the previous owned image.
     bstr_xappend(NULL, &p->cmd, bstr0("\033[?2026h"));
+    if (p->clear_on_flip)
+        bstr_xappend(NULL, &p->cmd, bstr0(TERM_ESC_CLEAR_SCREEN));
     bstr_xappend_asprintf(NULL, &p->cmd, TERM_ESC_GOTO_YX, p->top + 1, p->left + 1);
     if (p->opts.use_shm) {
         bstr_xappend_asprintf(NULL, &p->cmd,
@@ -424,6 +426,7 @@ static void flip_page(struct vo *vo)
     p->image_index = next;
     p->has_image = true;
     p->frame_ready = false;
+    p->clear_on_flip = false;
 
 #if HAVE_POSIX
     if (p->opts.use_shm)

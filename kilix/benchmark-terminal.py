@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import pty
 import resource
+import re
 import select
 import struct
 import subprocess
@@ -40,9 +41,22 @@ class Capture:
         self.global_deletes = 0
         self.first_frame = None
         self.dimensions = []
+        self.escape_tail = b''
+        self.synchronized = False
+        self.clears_outside_sync = 0
 
     def feed(self, chunk):
         self.wire_bytes += len(chunk)
+        escapes = self.escape_tail + chunk
+        end = 0
+        for match in re.finditer(rb'\x1b\[\?2026[hl]|\x1b\[2J', escapes):
+            token = match.group()
+            if token == b'\x1b[2J':
+                self.clears_outside_sync += not self.synchronized
+            else:
+                self.synchronized = token.endswith(b'h')
+            end = match.end()
+        self.escape_tail = escapes[max(end, len(escapes) - 8):]
         self.pending += chunk
         while True:
             start = self.pending.find(b'\x1b_G')
@@ -145,6 +159,7 @@ def run(player, clip, width, height, frames, extra):
                 trailing_nul_frames=capture.nul_frames, compressed_frames=capture.compressed,
                 image_ids=sorted(capture.ids), max_live_named_images=capture.max_live,
                 live_images_at_exit=len(capture.live), global_deletes=capture.global_deletes,
+                clears_outside_sync=capture.clears_outside_sync,
                 pixels_sha256=hashlib.sha256(''.join(unique_sequence).encode()).hexdigest(),
                 pixel_hashes=unique_sequence)
 

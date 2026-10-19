@@ -118,6 +118,7 @@ def main():
                                    ['--vo-kitty-compression=' + str(compression)])
             assert result['trailing_nul_frames'] == 0
             assert result['live_images_at_exit'] == 0
+            assert result['clears_outside_sync'] == 0, 'screen cleared before replacement'
         print('PASS tiny single-packet frames: raw and compressed', flush=True)
 
         bindings = root / 'input.conf'
@@ -144,6 +145,7 @@ def main():
             session.resize(0, 0)
             session.wait(lambda: session.capture.dimensions[-1] == (1280, 720))
             assert session.capture.max_live <= 2 and session.capture.global_deletes == 0
+            assert session.capture.clears_outside_sync == 0, 'resize cleared visible frame early'
         print('PASS fragmented/wide SGR motion, click, wheel, Ctrl-click, malformed recovery; 12 paused resizes; missing pixel geometry', flush=True)
 
         with Session(player, clip, root, ['--vo-kitty-use-shm=yes']) as session:

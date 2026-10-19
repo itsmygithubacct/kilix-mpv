@@ -4,6 +4,9 @@ A narrowly maintained mpv fork for `kilix video`, targeted at the next
 Plebian-OS release (provisionally 0.2.2), not RC6. The upstream version and
 commit are recorded in UPSTREAM.json. Version `0.40.0+kilix.2` improves terminal
 transport, input, and presentation while retaining mpv's decoder and playback clock.
+Version `0.40.0+kilix.3` keeps the visible image during reconfiguration and clears
+the screen only inside the synchronized replacement frame, preventing a paused
+resize from erasing the video and persistent diagnostics prematurely.
 
 The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
