@@ -122,7 +122,7 @@ def main():
         print('PASS tiny single-packet frames: raw and compressed', flush=True)
 
         bindings = root / 'input.conf'
-        bindings.write_text('MBTN_LEFT set pause no\nWHEEL_DOWN set mute yes\nCtrl+MBTN_LEFT set pause yes\n')
+        bindings.write_text('MBTN_LEFT set pause no\nWHEEL_DOWN set mute yes\nCtrl+MBTN_LEFT set pause yes\nESC set volume 42\n')
         with Session(player, clip, root, ['--pause', '--input-conf=' + str(bindings)]) as session:
             session.wait(lambda: session.capture.frames > 0)
             first_image = session.capture.digests[0]
@@ -139,6 +139,18 @@ def main():
             # Invalid numeric fields must not turn into key presses or poison the next packet.
             os.write(session.master, b'\x1b[<0;999999999999999999;1M\x1b[<35;280;20M')
             session.wait(lambda: 1100 < session.command('get_property', 'mouse-pos')['x'] < 1140)
+            os.write(session.master, b'\x1b')
+            session.wait(lambda: session.command('get_property', 'volume') == 42)
+            # A fragmented DECRQM reply enables precise pixel coordinates.
+            os.write(session.master, b'\x1b[?1016;')
+            time.sleep(.03)
+            os.write(session.master, b'1$y\x1b[<35;777;360M')
+            session.wait(lambda: session.command('get_property', 'mouse-pos')['x'] == 777)
+            os.write(session.master, b'\x1b[<35;0;0M')
+            session.wait(lambda: session.command('get_property', 'mouse-pos')['x'] == 0)
+            # Unsupported mode reply falls back to cells without swallowing keys.
+            os.write(session.master, b'\x1b[?1016;0$y\x1b[<35;290;20M')
+            session.wait(lambda: session.command('get_property', 'mouse-pos')['x'] > 1100)
             for width, height in [(320, 180), (640, 360), (480, 270), (160, 90)] * 3:
                 session.resize(width, height)
                 session.wait(lambda: session.capture.dimensions[-1] == (width, height))

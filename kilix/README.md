@@ -7,6 +7,8 @@ transport, input, and presentation while retaining mpv's decoder and playback cl
 Version `0.40.0+kilix.3` keeps the visible image during reconfiguration and clears
 the screen only inside the synchronized replacement frame, preventing a paused
 resize from erasing the video and persistent diagnostics prematurely.
+Version `0.40.0+kilix.4` negotiates pixel mouse coordinates for small OSC targets,
+connects fullscreen toggles to Kilix, and counts frames skipped by a busy SHM ring.
 
 The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
@@ -15,8 +17,9 @@ named player. Running it directly retains upstream mpv's configuration behavior.
 The package also installs `kilix-video FILE`, the matching Kilix launcher with
 terminal recovery and a persistent warning/error panel. The first four distinct
 messages stay visible until exit; additional diagnostics are printed after the
-terminal is restored. `kilix-video --transport shm FILE` enables local shared
-memory. The launcher source revision and file hashes are pinned in `LAUNCHER.json`.
+terminal is restored. The launcher automatically selects shared memory when it
+can verify a local Kitty/Kilix process with the same `/dev/shm` directory; otherwise
+it uses inline transfer. `--transport inline` and `--transport shm` override this. The launcher source revision and file hashes are pinned in `LAUNCHER.json`.
 Its GPL license and provenance are installed beside the player notices, and its
 exact source archive accompanies the package. `kilix video FILE` in the matching
 next-release host uses the same launcher.
@@ -70,18 +73,28 @@ reconfiguration. Private objects are cleaned up on normal exit.
 Local playback can use `--vo-kitty-use-shm=yes` to bypass base64 and PTY pixel
 copies. Three randomly named, owner-only objects hold immutable frames; terminal
 unlink acknowledges consumption. A busy ring skips a frame rather than
-overwriting unread pixels. Shared memory is opt-in: the terminal and player
-must share a POSIX shared-memory namespace. It cannot cross an SSH connection.
-The next-release host exposes this as `kilix video --transport shm FILE` and
-rejects known SSH/tmux sessions; default inline transport remains portable.
+overwriting unread pixels. The terminal and player must share a POSIX shared-memory namespace; shared
+memory cannot cross SSH. The launcher defaults to `--transport auto`, proving
+local process ownership and the shared directory before choosing SHM. Unknown
+terminals, separate namespaces, SSH and tmux retain inline transfer. Explicit
+`--transport shm` still requires a local shared namespace.
 
 SGR input supports large terminal coordinates, release, modifiers, wheel and
 motion, while retaining legacy X10 input. Mouse positions account for the
-cell-snapped letterbox origin. Coordinates still have cell precision. Paused
+cell-snapped letterbox origin. DEC mode 1016 is enabled and queried; supporting
+terminals report exact pixel positions, while other terminals retain SGR cell
+coordinates. Both modes are disabled on exit and supervisor recovery. Paused
 video checks geometry every 100 ms; it redraws without waiting for playback.
 Use Kilix's native mouse cursor (`software_mouse_cursor none`, `mouse_hide_wait 0`).
 The host disables text status overlays and restores synchronized-update and
 mouse modes even after a player crash.
+
+The launcher enables `--vo-kitty-terminal-fullscreen=yes` in a Kilix context when
+the selected player supports it. The OSC fullscreen button and `f` then send
+Kilix's existing self-scoped fullscreen toggle over the calling tty. Requests are
+serialized with graphics on the VO thread. This needs Kilix's existing remote
+control permission (or an equivalent Kitty configuration). It toggles the terminal
+window; mpv does not own that window or track fullscreen changes made outside mpv.
 
 ## Repeatable measurements
 
@@ -94,6 +107,7 @@ cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I . \
 /tmp/kilix-mpv-test-mouse
 python3 -B kilix/test-native.py /path/to/candidate /path/to/kilix-engine \
   /path/to/fixtures/pattern.mkv /path/to/native-evidence
+# Add --launcher /path/to/config/terminal_video.py to test the host supervisor.
 # Repeat the native check with --shm for local shared-memory transport.
 ```
 

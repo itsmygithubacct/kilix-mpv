@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <assert.h>
+#include <stdatomic.h>
 
 #include <termios.h>
 #include <unistd.h>
@@ -204,8 +205,10 @@ static void skip_buf(struct termbuf *b, unsigned int count)
 }
 
 static struct termbuf buf;
+static atomic_bool mouse_enabled;
+static atomic_bool mouse_pixels;
 
-static void terminal_mouse_position(struct input_ctx *ctx, double x, double y)
+static void terminal_mouse_position(struct input_ctx *ctx, double x, double y, bool pixels)
 {
     int rows = 25, cols = 80, width = 720, height = 450;
     terminal_get_size2(&rows, &cols, &width, &height);
@@ -213,20 +216,45 @@ static void terminal_mouse_position(struct input_ctx *ctx, double x, double y)
     mp_input_get_mouse_pos(ctx, &old_x, &old_y, &hover);
     if (!hover)
         mp_input_put_key(ctx, MP_KEY_MOUSE_ENTER);
-    mp_input_set_mouse_pos(ctx, (MPCLAMP(x, 1, cols) - 0.5) * width / cols,
-                          (MPCLAMP(y, 1, rows) - 0.5) * height / rows, false);
+    if (!pixels) {
+        x = (MPCLAMP(x, 1, cols) - 0.5) * width / cols;
+        y = (MPCLAMP(y, 1, rows) - 0.5) * height / rows;
+    }
+    mp_input_set_mouse_pos(ctx, x, y, false);
 }
 
 static void process_input(struct input_ctx *input_ctx, bool timeout)
 {
     while (buf.len) {
+        // DEC mode reports are ordered before subsequent pointer events. Until
+        // a terminal confirms pixel mode, keep interpreting SGR as cell input.
+        // Unknown/ignored mode 1016 therefore retains the legacy fallback.
+        const char report[] = "\033[?1016;1$y";
+        for (int state = 0; buf.len >= 3 && state <= 4; state++) {
+            char reply[sizeof(report)];
+            memcpy(reply, report, sizeof(report));
+            reply[8] = '0' + state;
+            int length = sizeof(report) - 1;
+            if (!memcmp(buf.b, reply, MPMIN(buf.len, length))) {
+                if (buf.len < length)
+                    goto read_more;
+                mouse_pixels = mouse_enabled && (state == 1 || state == 3);
+                skip_buf(&buf, length);
+                goto next_event;
+            }
+        }
         if (buf.len >= 3 && memcmp(buf.b, "\033[<", 3) == 0) {
             struct terminal_mouse_event event;
             int count = terminal_mouse_parse(buf.b, buf.len, &event);
             if (!count)
                 goto read_more;
             if (count > 0) {
-                terminal_mouse_position(input_ctx, event.x, event.y);
+                bool pixels = mouse_pixels;
+                if (!pixels && (!event.x || !event.y)) {
+                    skip_buf(&buf, count);
+                    continue;
+                }
+                terminal_mouse_position(input_ctx, event.x, event.y, pixels);
                 unsigned b = event.button;
                 int mods = ((b & 4) ? MP_KEY_MODIFIER_SHIFT : 0) |
                            ((b & 8) ? MP_KEY_MODIFIER_ALT : 0) |
@@ -338,11 +366,12 @@ static void process_input(struct input_ctx *input_ctx, bool timeout)
         if ((match->type == ENTRY_TYPE_MOUSE_BUTTON ||
              match->type == ENTRY_TYPE_MOUSE_MOVE) && seq_len >= 6)
         {
-            terminal_mouse_position(input_ctx, buf.b[4] - 32, buf.b[5] - 32);
+            terminal_mouse_position(input_ctx, buf.b[4] - 32, buf.b[5] - 32, false);
         }
         if (match->type != ENTRY_TYPE_MOUSE_MOVE)
             mp_input_put_key(input_ctx, buf.mods | match->mpkey);
         skip_buf(&buf, seq_len);
+next_event:;
     }
 
 read_more: ;  /* need more bytes */
@@ -623,6 +652,8 @@ void terminal_get_size2(int *rows, int *cols, int *px_width, int *px_height)
 
 void terminal_set_mouse_input(bool enable)
 {
+    mouse_enabled = enable;
+    mouse_pixels = false;
     printf(enable ? TERM_ESC_ENABLE_MOUSE : TERM_ESC_DISABLE_MOUSE);
     fflush(stdout);
 }

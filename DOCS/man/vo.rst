@@ -455,6 +455,13 @@ Available video output drivers are:
 
         This option is not implemented on Windows.
 
+    ``--vo-kitty-terminal-fullscreen=<yes|no>`` (default: no)
+        Forward fullscreen option changes as a self-scoped terminal fullscreen
+        toggle using Kitty remote control. This requires Kilix's tty fullscreen
+        permission or equivalent terminal configuration. Requests are serialized
+        with graphics output. The terminal window remains owned by the terminal;
+        external fullscreen changes are not reflected in mpv's option state.
+
 ``sixel``
     Graphical output for the terminal, using sixels. Tested with ``mlterm`` and
     ``xterm``.

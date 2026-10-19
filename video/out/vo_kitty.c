@@ -40,6 +40,7 @@
 #include <libavutil/random_seed.h>
 
 #include "options/m_config.h"
+#include "options/options.h"
 #include "input/input.h"
 #include "osdep/terminal.h"
 #include "osdep/timer.h"
@@ -92,7 +93,7 @@ static const bstr KITTY_ESC_END = bstr0_lit("\033\\");
 struct vo_kitty_opts {
     int width, height, top, left, rows, cols;
     bool config_clear, alt_screen;
-    bool use_shm;
+    bool use_shm, terminal_fullscreen;
     int compression, compression_threshold;
 };
 
@@ -110,7 +111,7 @@ struct priv {
     size_t compressed_capacity;
     bool frame_compressed, frame_ready, clear_on_flip;
     unsigned image_ids[2], image_index;
-    bool has_image;
+    bool has_image, fullscreen;
     int     shm_fd;
     bstr    cmd;
 
@@ -318,6 +319,13 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
     if (!p->frame)
         return VO_FALSE;
 
+    // A busy ring has no room for this frame. Avoid scaling/blending work and
+    // count the skipped presentation so frame-drop-count remains meaningful.
+    if (p->opts.use_shm && !create_shm(vo)) {
+        vo_increment_drop_count(vo, 1);
+        return VO_TRUE;
+    }
+
     if (frame->current) {
         mpi = mp_image_new_ref(frame->current);
         struct mp_rect src_rc = p->src;
@@ -332,9 +340,6 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
 
     struct mp_osd_res res = { .w = p->width, .h = p->height, .display_par = p->display_par };
     osd_draw_on_image(vo->osd, res, mpi ? mpi->pts : 0, 0, p->frame);
-
-    if (p->opts.use_shm && !create_shm(vo))
-        goto done;
 
     memcpy_pic(p->buffer, p->frame->planes[0], p->width * BYTES_PER_PX,
                p->height, p->width * BYTES_PER_PX, p->frame->stride[0]);
@@ -378,7 +383,6 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
     }
     p->frame_ready = true;
 
-done:
     talloc_free(mpi);
     return VO_TRUE;
 }
@@ -438,6 +442,7 @@ static int preinit(struct vo *vo)
 {
     struct priv *p = vo->priv;
 
+    p->fullscreen = vo->opts->fullscreen;
     p->image_ids[0] = 0x40000000u | (av_get_random_seed() & 0x3ffffffeu);
     p->image_ids[1] = p->image_ids[0] + 1;
     p->sws = mp_sws_alloc(vo);
@@ -474,6 +479,23 @@ static int query_format(struct vo *vo, int format)
 
 static int control(struct vo *vo, uint32_t request, void *data)
 {
+    if (request == VOCTRL_VO_OPTS_CHANGED) {
+        struct priv *p = vo->priv;
+        if (p->fullscreen != vo->opts->fullscreen) {
+            p->fullscreen = vo->opts->fullscreen;
+            if (p->opts.terminal_fullscreen) {
+                // Serialize with graphics on the VO thread. The self-scoped
+                // request uses Kilix's existing tty-only fullscreen permission.
+                // No separate process may write into an in-flight image packet.
+                write_str((unsigned char *)"\033P@kitty-cmd{\"cmd\":\"resize-os-window\","
+                          "\"version\":[0,26,0],\"no_response\":true,"
+                          "\"payload\":{\"self\":true,\"action\":\"toggle-fullscreen\"}}\033\\");
+            } else {
+                MP_WARN(vo, "Terminal fullscreen requires Kilix's fullscreen control.\n");
+            }
+        }
+        return VO_TRUE;
+    }
     if (request == VOCTRL_CHECK_EVENTS && vo->config_ok) {
         struct priv *p = vo->priv;
         int rows, cols, width, height;
@@ -556,6 +578,7 @@ const struct vo_driver video_out_kitty = {
         {"config-clear", OPT_BOOL(opts.config_clear), },
         {"alt-screen", OPT_BOOL(opts.alt_screen), },
         {"use-shm", OPT_BOOL(opts.use_shm), },
+        {"terminal-fullscreen", OPT_BOOL(opts.terminal_fullscreen), },
 #if HAVE_ZLIB
         {"compression", OPT_INT(opts.compression), M_RANGE(0, 9)},
         {"compression-threshold", OPT_INT(opts.compression_threshold), M_RANGE(1, 100)},

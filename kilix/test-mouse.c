@@ -15,7 +15,10 @@ int main(void)
     const unsigned char release[] = "\033[<0;1;2m";
     assert(terminal_mouse_parse(release, sizeof(release) - 1, &e) > 0);
     assert(e.release && e.x == 1 && e.y == 2);
-    const char *bad[] = {"\033[<;1;1M", "\033[<0;0;1M", "\033[<0;1;0M",
+    const unsigned char origin[] = "\033[<0;0;0M";
+    assert(terminal_mouse_parse(origin, sizeof(origin) - 1, &e) > 0);
+    assert(e.x == 0 && e.y == 0);
+    const char *bad[] = {"\033[<;1;1M",
         "\033[<0;1;2;3M", "\033[<0;2147483648;1M", "\033[<0;-1;2M",
         "\033[<0;1;2X", "\033[<0;1;9999999999999999999999999M"};
     for (size_t i = 0; i < sizeof(bad) / sizeof(*bad); i++)

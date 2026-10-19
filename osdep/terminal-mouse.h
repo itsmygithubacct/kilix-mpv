@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
-/* Bounded SGR mouse parser. Coordinates remain one-based terminal cells. */
+/* Bounded SGR mouse parser. Coordinates are interpreted by the negotiated terminal mode. */
 #ifndef MP_TERMINAL_MOUSE_H
 #define MP_TERMINAL_MOUSE_H
 #include <stdbool.h>
@@ -23,7 +23,7 @@ static inline int terminal_mouse_parse(const unsigned char *s, size_t n,
     for (size_t i = 3; i < n && i < 64; ++i) {
         unsigned c = s[i];
         if (c >= 0x40 && c <= 0x7e) {
-            if (invalid || field != 2 || !digits || !values[1] || !values[2] ||
+            if (invalid || field != 2 || !digits ||
                 (c != 'M' && c != 'm'))
                 return -(int)(i + 1);
             *out = (struct terminal_mouse_event){values[0], values[1], values[2], c == 'm'};
