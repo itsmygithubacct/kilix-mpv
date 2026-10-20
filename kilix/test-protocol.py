@@ -22,7 +22,7 @@ spec.loader.exec_module(benchmark)
 
 
 class Session:
-    def __init__(self, player, clip, root, options=(), acknowledge_shm=True):
+    def __init__(self, player, clip, root, options=(), acknowledge_shm=True, environment=None):
         self.master, self.slave = pty.openpty()
         self.original = termios.tcgetattr(self.slave)
         self.resize(1200, 720)
@@ -37,7 +37,7 @@ class Session:
             '--input-ipc-server=' + str(self.ipc), *options, str(clip)],
             stdin=self.slave, stdout=self.slave, stderr=self.slave, start_new_session=True,
             preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0),
-            env={'HOME': str(root), 'PATH': os.environ['PATH'], 'TERM': 'xterm-kitty'})
+            env={'HOME': str(root), 'PATH': os.environ['PATH'], 'TERM': 'xterm-kitty', **(environment or {})})
         self.stop = threading.Event()
         self.reader = threading.Thread(target=self.read, daemon=True)
         self.reader.start()
@@ -159,6 +159,16 @@ def main():
             assert session.capture.max_live <= 2 and session.capture.global_deletes == 0
             assert session.capture.clears_outside_sync == 0, 'resize cleared visible frame early'
         print('PASS fragmented/wide SGR motion, click, wheel, Ctrl-click, malformed recovery; 12 paused resizes; missing pixel geometry', flush=True)
+
+        # 300x40 cells of 12x27 pixels fit 16:9 video at exactly 1920x1080.
+        # Malformed or out-of-range sizes keep the 9x18 fallback (1280x720).
+        for value, expected in [('12x27', (1920, 1080)), ('1025x27', (1280, 720)),
+                                ('12x', (1280, 720)), ('12x27x', (1280, 720))]:
+            with Session(player, clip, root, ['--pause'], environment={'KILIX_MPV_CELL_SIZE': value}) as session:
+                session.wait(lambda: session.capture.frames > 0)
+                session.resize(0, 0)
+                session.wait(lambda: session.capture.dimensions[-1] == expected)
+        print('PASS measured cell size without pixel geometry; malformed sizes ignored', flush=True)
 
         with Session(player, clip, root, ['--vo-kitty-use-shm=yes']) as session:
             session.wait(lambda: session.capture.frames >= 20)

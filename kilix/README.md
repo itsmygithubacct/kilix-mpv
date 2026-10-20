@@ -10,6 +10,9 @@ the screen only inside the synchronized replacement frame, preventing a paused
 resize from erasing the video and persistent diagnostics prematurely.
 Version `0.40.0+kilix.4` negotiates pixel mouse coordinates for small OSC targets,
 connects fullscreen toggles to Kilix, and counts frames skipped by a busy SHM ring.
+Version `0.40.0+kilix.5` sizes frames from `KILIX_MPV_CELL_SIZE=<width>x<height>`
+when the PTY reports cells but no pixels, as in WSL panes behind ConPTY. Without
+it (or with a malformed value) mpv still assumes 9x18-pixel cells.
 
 The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
@@ -47,8 +50,8 @@ The build fetches the pinned launcher commit. For an offline build, set
 from the pinned Git objects and verified against their hashes.
 
 The tests exercise mouse actions, paused resizing, keyboard seek, tiny graphics
-packets, missing pixel geometry, bounded shared-memory backpressure and normal
-exit. Native visual/OSC checks are available separately. Full release acceptance
+packets, missing pixel geometry with and without a measured cell size, bounded
+shared-memory backpressure and normal exit. Native visual/OSC checks are available separately. Full release acceptance
 still requires physical display/audio checks and a clean
 Debian image install. Package builds are ABI-specific; publish only after those
 checks, and pin both source commit and package checksum in the stack release.

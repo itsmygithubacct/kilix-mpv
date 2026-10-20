@@ -56,6 +56,11 @@ static struct termios tio_orig;
 
 static int tty_in = -1, tty_out = -1;
 
+// Pixels per cell when the PTY reports none (e.g. WSL behind ConPTY). Kilix
+// measures the terminal and passes KILIX_MPV_CELL_SIZE=<width>x<height>;
+// otherwise match kitty-framebuffer's conservative 9x18 fallback.
+static int cell_width = 9, cell_height = 18;
+
 enum entry_type {
     ENTRY_TYPE_KEY = 0,
     ENTRY_TYPE_MOUSE_BUTTON,
@@ -645,9 +650,31 @@ void terminal_get_size2(int *rows, int *cols, int *px_width, int *px_height)
 
     *rows = ws.ws_row;
     *cols = ws.ws_col;
-    // Match kitty-framebuffer's conservative fallback when a PTY omits pixels.
-    *px_width = ws.ws_xpixel ? ws.ws_xpixel : ws.ws_col * 9;
-    *px_height = ws.ws_ypixel ? ws.ws_ypixel : ws.ws_row * 18;
+    *px_width = ws.ws_xpixel ? ws.ws_xpixel : ws.ws_col * cell_width;
+    *px_height = ws.ws_ypixel ? ws.ws_ypixel : ws.ws_row * cell_height;
+}
+
+static int parse_cell_dimension(const char **text)
+{
+    int value = 0;
+    while (mp_isdigit(**text) && value <= 1024)
+        value = value * 10 + *(*text)++ - '0';
+    return value <= 1024 ? value : 0;
+}
+
+static void read_cell_size(void)
+{
+    const char *text = getenv("KILIX_MPV_CELL_SIZE");
+    if (!text)
+        return;
+    int width = parse_cell_dimension(&text);
+    if (*text++ != 'x')
+        return;
+    int height = parse_cell_dimension(&text);
+    if (width && height && !*text) {
+        cell_width = width;
+        cell_height = height;
+    }
 }
 
 void terminal_set_mouse_input(bool enable)
@@ -675,6 +702,7 @@ void terminal_init(void)
     }
 
     tcgetattr(tty_in, &tio_orig);
+    read_cell_size();
 
     // handlers to fix terminal settings
     setsigaction(SIGCONT, stop_cont_sighandler, 0, true);

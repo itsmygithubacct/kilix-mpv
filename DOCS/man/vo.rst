@@ -430,7 +430,9 @@ Available video output drivers are:
 
     ``--vo-kitty-width=<width>``, ``--vo-kitty-height=<height>`` (default: 0)
         Specify the available size in pixels, otherwise (0) read it from the
-        terminal, or fall back to 320x240.
+        terminal, or fall back to 320x240. If the terminal reports cells but no
+        pixels, each cell is assumed to be 9x18 pixels, or the size given by the
+        ``KILIX_MPV_CELL_SIZE=<width>x<height>`` environment variable.
 
     ``--vo-kitty-left=<col>``, ``--vo-kitty-top=<row>`` (default: 0)
         Specify the position in character cells where the image starts (1 is
