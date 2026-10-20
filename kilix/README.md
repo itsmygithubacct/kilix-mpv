@@ -1,7 +1,8 @@
 # kilix-mpv
 
-A narrowly maintained mpv fork for `kilix video`, targeted at the next
-Plebian-OS release (provisionally 0.2.2), not RC6. The upstream version and
+A narrowly maintained mpv fork for `kilix video`, required for Plebian-OS 0.2.2
+after the frozen RC6 candidate. Package publication, coordinated OS integration,
+and target-image playback acceptance remain pending. The upstream version and
 commit are recorded in UPSTREAM.json. Version `0.40.0+kilix.2` improves terminal
 transport, input, and presentation while retaining mpv's decoder and playback clock.
 Version `0.40.0+kilix.3` keeps the visible image during reconfiguration and clears
