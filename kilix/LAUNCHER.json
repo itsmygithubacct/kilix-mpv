@@ -1,9 +1,9 @@
 {
   "repository": "https://github.com/itsmygithubacct/kilix.git",
-  "commit": "56b3989e212d1da327093903f15977e0154e732e",
+  "commit": "fb0a7f036fbe599dcf060d2d389e309c6261ceaf",
   "files": {
-    "config/terminal_video.py": "e132b44b214fc6e4be6a6ac9f106b417797b2f1d9d4fc42c233845b0f7d01087",
-    "config/terminal_video_errors.lua": "27814b08bb39d69f69e7e069a3a7196030e64ec439a72ad673535568cd1fea86",
+    "config/terminal_video.py": "8f4ecb983d2225426866705cfafafd5f52cc6c06a6484c048a5db9841a054791",
+    "config/terminal_video_errors.lua": "863526097253f64e4eb3d15ccd3d797eeb6cdde6ddfe6017cbe652fd3165ce8c",
     "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
   }
 }

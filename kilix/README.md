@@ -13,6 +13,9 @@ connects fullscreen toggles to Kilix, and counts frames skipped by a busy SHM ri
 Version `0.40.0+kilix.5` sizes frames from `KILIX_MPV_CELL_SIZE=<width>x<height>`
 when the PTY reports cells but no pixels, as in WSL panes behind ConPTY. Without
 it (or with a malformed value) mpv still assumes 9x18-pixel cells.
+Version `0.40.0+kilix.6` packages the matching launcher: it queries the terminal's
+cell size when needed, keeps WSL playback responsive after a pause, and terminates
+an interrupted graphics command before restoring the terminal after a player crash.
 
 The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
