@@ -48,6 +48,6 @@ chmod -R a+rX "$package"
 stem="kilix-mpv_${version}_${arch}"
 dpkg-deb --root-owner-group --build "$package" "$out/$stem.deb"
 git -C "$root" archive --format=tar --prefix="kilix-mpv-$version/" "$revision" | gzip -n > "$out/kilix-mpv_$version.source.tar.gz"
-printf '{"package":"kilix-mpv","version":"%s","source_commit":"%s","launcher_commit":"%s","architecture":"%s","stack_target":"next release; not RC6"}\n' "$version" "$revision" "$launcher_revision" "$arch" > "$out/$stem.json"
+printf '{"package":"kilix-mpv","version":"%s","source_commit":"%s","launcher_commit":"%s","architecture":"%s","stack_target":"Plebian-OS 0.2.2; after frozen RC6"}\n' "$version" "$revision" "$launcher_revision" "$arch" > "$out/$stem.json"
 (cd "$out" && sha256sum "$stem.deb" "kilix-mpv_$version.source.tar.gz" "kilix-launcher_$launcher_revision.source.tar.gz" "$stem.json" > SHA256SUMS)
 printf 'Package and source: %s\n' "$out"
