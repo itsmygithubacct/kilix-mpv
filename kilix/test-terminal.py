@@ -14,12 +14,14 @@ import termios
 import time
 
 
-def run(player, sample, home, renderer, action):
+def run(player, sample, home, renderer, action, *, use_config=False,
+        expected_renderer=None):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 80, 320, 192))
     proc = subprocess.Popen(
-        [player, '--no-config', '--load-scripts=no', '--vo=' + renderer,
-         '--mute=yes', '--loop-file=inf', str(sample)],
+        [player, *([] if use_config else ['--no-config']), '--load-scripts=no',
+         *([] if renderer is None else ['--vo=' + renderer]),
+         '--audio=no', '--loop-file=inf', str(sample)],
         stdin=slave, stdout=slave, stderr=slave, start_new_session=True,
         preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0),
         env={'HOME': str(home), 'PATH': os.environ['PATH'], 'TERM': 'xterm-kitty'})
@@ -55,8 +57,9 @@ def run(player, sample, home, renderer, action):
         proc.wait(timeout=2)
         assert proc.returncode == 0, (renderer, action, proc.returncode, repr(tail[-400:]))
         assert sent and quit_sent, (renderer, action, 'exited before interaction')
-        assert renderer != 'kitty' or graphics, 'no Kitty graphics output'
-        print(f'PASS {renderer}: {action}, quit', flush=True)
+        expected = expected_renderer or renderer or 'kitty'
+        assert graphics == (expected == 'kitty'), (expected, 'unexpected graphics output', graphics)
+        print(f'PASS {renderer or "default"} (config={use_config}, expected={expected}): {action}, quit', flush=True)
     finally:
         if proc.poll() is None:
             proc.kill()
@@ -68,9 +71,17 @@ if __name__ == '__main__':
     player = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix='kilix-mpv-test-') as directory:
         home = Path(directory)
-        sample = home / 'sample.mp4'
+        sample = home / 'sample with spaces.mp4'
         subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i',
                         'testsrc=size=128x96:rate=5', '-t', '12', '-c:v', 'mpeg4', str(sample)], check=True)
-        for renderer in ('kitty', 'tct'):
+        for renderer in (None, 'kitty', 'tct'):
             for action in ('mouse', 'resize', 'seek'):
                 run(player, sample, home, renderer, action)
+        run(player, sample, home, None, 'seek', use_config=True)
+        run(player, sample, home, 'null', 'seek')
+        config = home / '.config' / 'mpv' / 'mpv.conf'
+        config.parent.mkdir(parents=True)
+        config.write_text('vo=null\n', encoding='utf-8')
+        run(player, sample, home, None, 'seek', use_config=True, expected_renderer='null')
+        run(player, sample, home, 'kitty', 'seek', use_config=True)
+        run(player, sample, home, None, 'seek')

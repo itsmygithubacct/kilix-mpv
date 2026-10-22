@@ -19,7 +19,10 @@ an interrupted graphics command before restoring the terminal after a player cra
 
 The Debian package installs `/usr/bin/kilix-mpv`. It does not provide, replace,
 or conflict with `/usr/bin/mpv`. Kilix owns terminal cleanup and prefers this
-named player. Running it directly retains upstream mpv's configuration behavior.
+named player. Running `kilix-mpv FILE` directly defaults to inline Kitty video,
+with terminal status overlays disabled. Configuration files and explicit options
+such as `--vo=tct` still override these defaults; `--no-config` also plays inline.
+These CLI defaults do not change libmpv clients.
 
 The package also installs `kilix-video FILE`, the matching Kilix launcher with
 terminal recovery and a persistent warning/error panel. The first four distinct

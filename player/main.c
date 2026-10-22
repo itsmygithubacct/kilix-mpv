@@ -443,6 +443,14 @@ int mpv_main(int argc, char *argv[])
 
     mpctx->is_cli = true;
 
+    // The Kilix CLI is a terminal player. Apply defaults before user config
+    // and command-line options so explicit overrides still work. Keep these
+    // out of mp_create(), which is also used by libmpv clients.
+    m_config_parse(mpctx->mconfig, "", bstr0(
+        "vo=kitty\n"
+        "term-osd=no\n"
+        "term-status-msg=\n"), NULL, 0);
+
     char **options = argv && argv[0] ? argv + 1 : NULL; // skips program name
     int r = mp_initialize(mpctx, options);
     if (r == 0)
