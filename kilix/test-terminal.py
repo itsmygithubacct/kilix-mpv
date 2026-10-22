@@ -80,7 +80,7 @@ if __name__ == '__main__':
         run(player, sample, home, None, 'seek', use_config=True)
         run(player, sample, home, 'null', 'seek')
         config = home / '.config' / 'mpv' / 'mpv.conf'
-        config.parent.mkdir(parents=True)
+        config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text('vo=null\n', encoding='utf-8')
         run(player, sample, home, None, 'seek', use_config=True, expected_renderer='null')
         run(player, sample, home, 'kitty', 'seek', use_config=True)
