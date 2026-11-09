@@ -34,6 +34,7 @@ On Debian 13, with the build dependencies listed in
 
 ```sh
 bash kilix/build-package.sh /absolute/output/directory
+sudo apt install /absolute/output/directory/kilix-mpv_*.deb
 kilix-mpv FILE          # inline Kitty video in the current pane
 kilix-video FILE        # the Kilix launcher, with terminal recovery
 ```
