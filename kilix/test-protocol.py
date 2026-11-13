@@ -106,6 +106,23 @@ class Session:
             os.close(self.slave)
 
 
+def check_shutdown_drain(player, clip, root):
+    with Session(player, clip, root, ['--pause', '--vo-kitty-use-shm=yes'],
+                 acknowledge_shm=False) as session:
+        session.wait(lambda: session.capture.frames > 0)
+        paths = list(Path('/dev/shm').glob(f'kilix-mpv-{session.process.pid}-*'))
+        expected = {p: p.read_bytes() for p in paths}
+        assert expected
+        session.command('quit')
+        time.sleep(.04)
+        assert session.process.poll() is None, 'exit did not wait for the terminal acknowledgment'
+        for path, data in expected.items():
+            assert path.read_bytes() == data, 'queued final frame was reclaimed early'
+            path.unlink()
+        session.process.wait(timeout=2)
+    print('PASS delayed final shared-memory acknowledgment before shutdown', flush=True)
+
+
 def main():
     player = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix='kilix-mpv-protocol-') as directory:
@@ -113,6 +130,7 @@ def main():
         clip = root / 'clip.mkv'
         subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
                         'testsrc2=size=128x72:rate=30', '-t', '2', '-c:v', 'ffv1', str(clip)], check=True)
+        check_shutdown_drain(player, clip, root)
         for compression in (0, 1):
             result = benchmark.run(player, clip, 16, 16, 2,
                                    ['--vo-kitty-compression=' + str(compression)])

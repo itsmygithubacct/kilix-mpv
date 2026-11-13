@@ -527,6 +527,28 @@ static void uninit(struct vo *vo)
 {
     struct priv *p = vo->priv;
 
+#if HAVE_POSIX_SHM
+    // A successful tty write only queues the command. Give the terminal a
+    // bounded opportunity to open/unlink published frames before reclaiming
+    // their names, including the final redraw at EOF.
+    int64_t deadline = mp_time_ns() + MP_TIME_MS_TO_NS(200);
+    while (p->opts.use_shm) {
+        bool pending = false;
+        for (unsigned i = 0; i < 3; ++i) {
+            if (!p->shm_owned[i])
+                continue;
+            int fd = shm_open(p->shm_names[i], O_RDONLY, 0);
+            if (fd >= 0) {
+                close(fd);
+                pending = true;
+            }
+        }
+        if (!pending || mp_time_ns() >= deadline)
+            break;
+        mp_sleep_ns(MP_TIME_MS_TO_NS(1));
+    }
+#endif
+
     write_str((unsigned char *)"\033[?2026l");
     delete_images(vo);
     write_str(TERM_ESC_RESTORE_CURSOR);

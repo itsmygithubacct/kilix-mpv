@@ -164,3 +164,7 @@ configuration. The named binary avoids changing other applications' mpv behavior
 
 No RC6 release pin is changed by this repository. The next-release host branch
 and release staging notes must be merged through the coordinated release process.
+
+Shared-memory shutdown waits up to 200 ms for the terminal to unlink queued
+frames before reclaiming the player-owned names. This covers final redraws
+at EOF without leaving an unresponsive consumer able to block exit.

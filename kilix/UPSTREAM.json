@@ -9,6 +9,7 @@
     "Synchronized presentation with two owned image IDs and targeted cleanup",
     "Bounded immutable shared-memory ring with terminal unlink acknowledgment",
     "Bounded SGR mouse parsing and letterbox coordinate mapping",
-    "Keep RGB and unsubsampled color axes aligned during software scaling"
+    "Keep RGB and unsubsampled color axes aligned during software scaling",
+    "Drain queued shared-memory frames before bounded exit cleanup"
   ]
 }
