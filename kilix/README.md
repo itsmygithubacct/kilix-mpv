@@ -24,6 +24,13 @@ with terminal status overlays disabled. Configuration files and explicit options
 such as `--vo=tct` still override these defaults; `--no-config` also plays inline.
 These CLI defaults do not change libmpv clients.
 
+Version `0.40.0+kilix.9` corrects software-scaling chroma positions. RGB
+channels and YUV axes without subsampling share pixel positions; assigning
+them a guessed YUV offset shifted color edges. The scaler now leaves RGB
+positioning to swscale and removes offsets on unsubsampled YUV axes. Exact
+RGB comparisons against FFmpeg cover 4:2:0, 4:2:2, 4:4:4 and RGB sources,
+left/center chroma, odd output dimensions and both terminal transports.
+
 The package also installs `kilix-video FILE`, the matching Kilix launcher with
 terminal recovery and a persistent warning/error panel. The first four distinct
 messages stay visible until exit; additional diagnostics are printed after the
@@ -141,7 +148,8 @@ supported by its scaler. It converts to RGB while scaling to the terminal's
 size, avoiding a full-resolution RGB conversion before downscaling. The
 configured scaler and quality flags still apply. Combining the two operations
 can change rounding and chroma interpolation; it does not promise identical
-pixels to the old two-step YUV path. RGB input is unchanged.
+pixels to the old two-step YUV path. Version .9 also corrects the RGB
+sample-position issue described above; it does not preserve that earlier bias.
 
 `python3 -B kilix/test-yuv.py /path/to/player` checks native format negotiation,
 scaling, cropped frames, and identical inline/shared-memory pixels for six

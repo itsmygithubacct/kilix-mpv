@@ -310,13 +310,21 @@ int mp_sws_reinit(struct mp_sws_context *ctx)
     int cr_src = pl_chroma_to_av(src.chroma_location);
     int cr_dst = pl_chroma_to_av(dst.chroma_location);
     int cr_xpos, cr_ypos;
-    if (av_chroma_location_enum_to_pos(&cr_xpos, &cr_ypos, cr_src) >= 0) {
-        av_opt_set_int(ctx->sws, "src_h_chr_pos", cr_xpos, 0);
-        av_opt_set_int(ctx->sws, "src_v_chr_pos", cr_ypos, 0);
+    struct mp_imgfmt_desc src_desc = mp_imgfmt_get_desc(src.imgfmt);
+    struct mp_imgfmt_desc dst_desc = mp_imgfmt_get_desc(dst.imgfmt);
+    // RGB channels share sample locations. A guessed YUV chroma location
+    // introduces a half-pixel shift; let swscale derive RGB's positions from
+    // its actual internal subsampling instead. YUV axes without subsampling
+    // also have co-located samples (including the vertical axis in 4:2:2).
+    if (src.repr.sys != PL_COLOR_SYSTEM_RGB &&
+        av_chroma_location_enum_to_pos(&cr_xpos, &cr_ypos, cr_src) >= 0) {
+        av_opt_set_int(ctx->sws, "src_h_chr_pos", src_desc.chroma_xs ? cr_xpos : 0, 0);
+        av_opt_set_int(ctx->sws, "src_v_chr_pos", src_desc.chroma_ys ? cr_ypos : 0, 0);
     }
-    if (av_chroma_location_enum_to_pos(&cr_xpos, &cr_ypos, cr_dst) >= 0) {
-        av_opt_set_int(ctx->sws, "dst_h_chr_pos", cr_xpos, 0);
-        av_opt_set_int(ctx->sws, "dst_v_chr_pos", cr_ypos, 0);
+    if (dst.repr.sys != PL_COLOR_SYSTEM_RGB &&
+        av_chroma_location_enum_to_pos(&cr_xpos, &cr_ypos, cr_dst) >= 0) {
+        av_opt_set_int(ctx->sws, "dst_h_chr_pos", dst_desc.chroma_xs ? cr_xpos : 0, 0);
+        av_opt_set_int(ctx->sws, "dst_v_chr_pos", dst_desc.chroma_ys ? cr_ypos : 0, 0);
     }
 
     // This can fail even with normal operation, e.g. if a conversion path
