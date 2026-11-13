@@ -474,7 +474,10 @@ static int preinit(struct vo *vo)
 
 static int query_format(struct vo *vo, int format)
 {
-    return format == IMGFMT;
+    // Convert and scale together at the terminal's size. Requiring RGB24 here
+    // makes the filter chain first convert YUV at the full decoded resolution.
+    struct priv *p = vo->priv;
+    return mp_sws_supports_formats(p->sws, IMGFMT, format);
 }
 
 static int control(struct vo *vo, uint32_t request, void *data)

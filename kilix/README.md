@@ -136,6 +136,17 @@ maintained source and `UPSTREAM.json` describe the current broader changes.
 
 ## Maintenance and distribution
 
+The terminal renderer accepts decoded YUV, higher-bit-depth and RGB formats
+supported by its scaler. It converts to RGB while scaling to the terminal's
+size, avoiding a full-resolution RGB conversion before downscaling. The
+configured scaler and quality flags still apply. Combining the two operations
+can change rounding and chroma interpolation; it does not promise identical
+pixels to the old two-step YUV path. RGB input is unchanged.
+
+`python3 -B kilix/test-yuv.py /path/to/player` checks native format negotiation,
+scaling, cropped frames, and identical inline/shared-memory pixels for six
+formats. The package build runs this check alongside the control/protocol tests.
+
 Keep upstream history and license notices. Review upstream releases and security
 fixes; this fork does not promise a frozen upstream version indefinitely. Rebase
 or merge deliberately, rerun terminal tests, and bump VERSION for every published
