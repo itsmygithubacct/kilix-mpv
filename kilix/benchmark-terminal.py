@@ -45,6 +45,9 @@ class Capture:
         self.escape_tail = b''
         self.synchronized = False
         self.clears_outside_sync = 0
+        # Without acknowledgment: each announced shared-memory name and the
+        # bytes it held when the terminal read it.
+        self.shm_frames = {}
 
     def feed(self, chunk):
         self.wire_bytes += len(chunk)
@@ -98,6 +101,8 @@ class Capture:
                     raw = path.read_bytes()
                     if self.acknowledge_shm:
                         path.unlink()  # terminal acknowledgment; allow slot reuse
+                    else:
+                        self.shm_frames[path] = raw
                 if self.headers.get(b'o') == b'z':
                     raw = zlib.decompress(raw)
                     self.compressed += 1

@@ -110,8 +110,13 @@ def check_shutdown_drain(player, clip, root):
     with Session(player, clip, root, ['--pause', '--vo-kitty-use-shm=yes'],
                  acknowledge_shm=False) as session:
         session.wait(lambda: session.capture.frames > 0)
-        paths = list(Path('/dev/shm').glob(f'kilix-mpv-{session.process.pid}-*'))
-        expected = {p: p.read_bytes() for p in paths}
+        # The queued frames are the ones mpv has announced, with the bytes the
+        # terminal read. mpv creates and fills a segment before announcing it,
+        # so an unannounced segment may still be partly written; quit only
+        # once every segment present has been announced.
+        pattern = f'kilix-mpv-{session.process.pid}-*'
+        session.wait(lambda: set(Path('/dev/shm').glob(pattern)) <= set(session.capture.shm_frames.copy()))
+        expected = session.capture.shm_frames.copy()
         assert expected
         session.command('quit')
         time.sleep(.04)

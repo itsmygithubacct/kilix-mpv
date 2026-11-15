@@ -30,6 +30,10 @@ them a guessed YUV offset shifted color edges. The scaler now leaves RGB
 positioning to swscale and removes offsets on unsubsampled YUV axes. Exact
 RGB comparisons against FFmpeg cover 4:2:0, 4:2:2, 4:4:4 and RGB sources,
 left/center chroma, odd output dimensions and both terminal transports.
+Version `0.40.0+kilix.10` changes no player code. Its shutdown-drain check now
+compares the frames mpv announced with the bytes the terminal read. Before,
+it read every segment present, including one mpv was still filling; on
+slower machines, such as an RK3399 board, that torn read failed the check.
 
 The package also installs `kilix-video FILE`, the matching Kilix launcher with
 terminal recovery and a persistent warning/error panel. The first four distinct
