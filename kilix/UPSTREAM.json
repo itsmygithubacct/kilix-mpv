@@ -2,7 +2,7 @@
   "repository": "https://github.com/mpv-player/mpv.git",
   "tag": "v0.40.0",
   "commit": "e48ac7ce08462f5e33af6ef9deeac6fa87eef01e",
-  "stack_target": "next release (provisionally 0.2.2); not RC6",
+  "stack_target": "Plebian-OS 0.2.4",
   "patches": [
     "Reset freed buffers and resize paused video through geometry polling",
     "Adaptive lossless zlib transport and exact base64 packet termination",

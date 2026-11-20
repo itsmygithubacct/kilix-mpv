@@ -1,9 +1,9 @@
 # kilix-mpv
 
-A narrowly maintained mpv fork for `kilix video`, required for Plebian-OS 0.2.2
-after the frozen RC6 candidate. Package publication, coordinated OS integration,
-and target-image playback acceptance remain pending. The upstream version and
-commit are recorded in UPSTREAM.json. Version `0.40.0+kilix.2` improves terminal
+A narrowly maintained mpv fork for `kilix video` and Kilix Amp. The Debian
+package for Plebian-OS 0.2.4 includes PulseAudio and ALSA audio output.
+The upstream version and commit are recorded in UPSTREAM.json.
+Version `0.40.0+kilix.2` improves terminal
 transport, input, and presentation while retaining mpv's decoder and playback clock.
 Version `0.40.0+kilix.3` keeps the visible image during reconfiguration and clears
 the screen only inside the synchronized replacement frame, preventing a paused
@@ -50,15 +50,15 @@ next-release host uses the same launcher.
 On Debian 13, install `build-essential meson ninja-build pkg-config git dpkg-dev
 python3 ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev
 libswresample-dev libswscale-dev libplacebo-dev libass-dev libluajit-5.1-dev
-libpulse-dev zlib1g-dev` and their package dependencies. Then, from a clean checkout:
+libpulse-dev libasound2-dev zlib1g-dev` and their package dependencies. From a clean checkout, run
 
 ```sh
 bash kilix/build-package.sh /absolute/output/directory
 ```
 
-This builds terminal playback with Lua controls and PulseAudio, stages without
-root, removes build-tree runtime paths through Meson's install step, tests the
-staged executable in private PTYs, and creates a Debian package, corresponding
+This builds terminal playback with Lua controls, stages without root, verifies
+audio output against a private ALSA device and tests the staged executable
+in private PTYs. It creates a Debian package, corresponding
 source archive, metadata and SHA256SUMS. Dependencies are derived from the binary
 using dpkg-shlibdeps. The output directory must be outside the checkout.
 `KILIX_MPV_BUILD_JOBS` controls parallel compilation (default 2).
@@ -165,9 +165,6 @@ or merge deliberately, rerun terminal tests, and bump VERSION for every publishe
 package. Each binary release must accompany its exact source archive and
 checksums. Preserve GPL/LGPL notices; this build uses upstream's default GPL
 configuration. The named binary avoids changing other applications' mpv behavior.
-
-No RC6 release pin is changed by this repository. The next-release host branch
-and release staging notes must be merged through the coordinated release process.
 
 Shared-memory shutdown waits up to 200 ms for the terminal to unlink queued
 frames before reclaiming the player-owned names. This covers final redraws

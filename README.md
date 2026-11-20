@@ -5,14 +5,14 @@ kilix-mpv is a narrowly maintained fork of [mpv](https://github.com/mpv-player/m
 and playback clock and changes the Kitty-graphics terminal output, mouse input
 and resizing. The upstream mpv README follows this Kilix section unchanged.
 
-**Status:** ships in Plebian-OS 0.2.3. Firstboot installs the Debian package
-`kilix-mpv_0.40.0+kilix.7_amd64.deb` from this repository's
-`v0.40.0-kilix.7-test.1` release, named by `PLEBIAN_OS_MPV_URL` in
-`releases/0.2.3.env` and pinned there to source commit `d743a367` (the current
-`main`) and to the Kilix launcher commit recorded in
-[kilix/LAUNCHER.json](kilix/LAUNCHER.json). The package installs
-`/usr/bin/kilix-mpv` and `/usr/bin/kilix-video`; it does not replace
-`/usr/bin/mpv`.
+Plebian-OS 0.2.3 ships the amd64 `0.40.0+kilix.9` package from commit
+`d27f1762`. The `0.40.0+kilix.11` candidate targets Plebian-OS 0.2.4 and
+installs `/usr/bin/kilix-mpv` and `/usr/bin/kilix-video`.
+[0.2.3 release pins](https://github.com/itsmygithubacct/plebian-os/blob/v0.2.3/releases/0.2.3.env)
+
+Kilix Amp uses the player's JSON IPC for general audio playback. The Debian
+package tries PulseAudio first, including PipeWire's PulseAudio service, then
+the default ALSA device when that service is unavailable.
 
 ## What it changes
 

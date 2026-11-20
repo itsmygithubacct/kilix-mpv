@@ -14,11 +14,12 @@ mkdir -p "$out"
 work="$(mktemp -d "$out/.build.XXXXXXXX")"
 trap 'rm -rf -- "$work"' EXIT
 meson setup "$work/build" "$root" --prefix=/usr/local --buildtype=release \
-  -Dauto_features=disabled -Dzlib=enabled -Dgl=disabled -Dlibmpv=false -Dlua=luajit -Dpulse=enabled
+  -Dauto_features=disabled -Dzlib=enabled -Dgl=disabled -Dlibmpv=false -Dlua=luajit -Dpulse=enabled -Dalsa=enabled
 ninja -C "$work/build" -j "${KILIX_MPV_BUILD_JOBS:-2}"
 meson install -C "$work/build" --no-rebuild --destdir "$work/stage"
 cc -std=c11 -Wall -Wextra -Werror -I "$root" "$root/kilix/test-mouse.c" -o "$work/test-mouse"
 "$work/test-mouse"
+python3 "$root/kilix/test-audio.py" "$work/stage/usr/local/bin/mpv"
 python3 "$root/kilix/test-terminal.py" "$work/stage/usr/local/bin/mpv"
 python3 -B "$root/kilix/test-protocol.py" "$work/stage/usr/local/bin/mpv"
 python3 -B "$root/kilix/test-yuv.py" "$work/stage/usr/local/bin/mpv"
@@ -49,6 +50,7 @@ chmod -R a+rX "$package"
 stem="kilix-mpv_${version}_${arch}"
 dpkg-deb --root-owner-group --build "$package" "$out/$stem.deb"
 git -C "$root" archive --format=tar --prefix="kilix-mpv-$version/" "$revision" | gzip -n > "$out/kilix-mpv_$version.source.tar.gz"
-printf '{"package":"kilix-mpv","version":"%s","source_commit":"%s","launcher_commit":"%s","architecture":"%s","stack_target":"Plebian-OS 0.2.3 RC9"}\n' "$version" "$revision" "$launcher_revision" "$arch" > "$out/$stem.json"
+stack_target=$(python3 -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1]))["stack_target"]))' "$root/kilix/UPSTREAM.json")
+printf '{"package":"kilix-mpv","version":"%s","source_commit":"%s","launcher_commit":"%s","architecture":"%s","stack_target":%s}\n' "$version" "$revision" "$launcher_revision" "$arch" "$stack_target" > "$out/$stem.json"
 (cd "$out" && sha256sum "$stem.deb" "kilix-mpv_$version.source.tar.gz" "kilix-launcher_$launcher_revision.source.tar.gz" "$stem.json" > SHA256SUMS)
 printf 'Package and source: %s\n' "$out"
