@@ -208,12 +208,21 @@ def main():
             # the graphics command publishes a frame as ready for the reader.
             session.wait(lambda: session.capture.frames == 3)
             assert len(paths()) == 3
-            first = {p.name: p.read_bytes() for p in paths()}
+            first = {p: p.read_bytes() for p in paths()}
+            session.command('set_property', 'pause', True)
             session.resize(640, 360)
             time.sleep(.4)
-            assert {p.name: p.read_bytes() for p in paths()} == first, 'unread frames overwritten'
+            assert {p: p.read_bytes() for p in paths()} == first, 'unread frames overwritten'
             assert session.capture.frames == 3, 'published beyond the unread ring'
-        print('PASS shared-memory backpressure: three immutable slots, resize, exit cleanup', flush=True)
+            # Only acknowledge one slot. The paused resize must arrive in that
+            # slot without new input or another decoded frame.
+            released = next(iter(first))
+            released.unlink()
+            session.wait(lambda: session.capture.frames == 4)
+            assert session.capture.dimensions[-1] == (640, 360)
+            assert session.command('get_property', 'pause')
+            assert all(p.read_bytes() == data for p, data in first.items() if p != released)
+        print('PASS shared-memory backpressure, paused resize after acknowledgment, exit cleanup', flush=True)
 
 
 if __name__ == '__main__':

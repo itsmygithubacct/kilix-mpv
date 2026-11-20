@@ -55,6 +55,7 @@
 #define DEFAULT_HEIGHT_PX 240
 #define DEFAULT_WIDTH 80
 #define DEFAULT_HEIGHT 25
+#define TERMINAL_POLL_NS MP_TIME_MS_TO_NS(100)
 
 static inline void write_bstr(bstr bs)
 {
@@ -106,6 +107,7 @@ struct priv {
     char    *shm_names[3];
     bool shm_owned[3];
     unsigned shm_slot;
+    int64_t shm_redraw_at;
     int     buffer_size, output_size, output_length;
     uint8_t *compressed;
     size_t compressed_capacity;
@@ -268,13 +270,17 @@ static int create_shm(struct vo *vo)
     struct priv *p = vo->priv;
     // Like kitty-framebuffer, retain a bounded ring of immutable objects.
     // Kitty unlinks a name after reading it; never overwrite an unread frame.
-    for (unsigned tries = 0; tries < 3; tries++) {
-        unsigned slot = (p->shm_slot + tries) % 3;
+    unsigned occupied = 0;
+    for (unsigned tries = 0; tries < MP_ARRAY_SIZE(p->shm_names); tries++) {
+        unsigned slot = (p->shm_slot + tries) % MP_ARRAY_SIZE(p->shm_names);
         int fd = shm_open(p->shm_names[slot], O_CREAT | O_EXCL | O_RDWR,
                           S_IRUSR | S_IWUSR);
-        if (fd < 0)
+        if (fd < 0) {
+            if (errno == EEXIST)
+                occupied++;
             continue;
-        p->shm_slot = (slot + 1) % 3;
+        }
+        p->shm_slot = (slot + 1) % MP_ARRAY_SIZE(p->shm_names);
         p->shm_owned[slot] = true;
         p->shm_path = p->shm_names[slot];
         p->shm_fd = fd;
@@ -282,8 +288,14 @@ static int create_shm(struct vo *vo)
         av_base64_encode(p->shm_path_b64, 256, p->shm_path + 1, size);
         break;
     }
-    if (p->shm_fd < 0)
+    if (p->shm_fd < 0) {
+        // Playing video gets another draw on the next frame. If playback
+        // pauses here, the terminal still needs the latest pending redraw.
+        if (occupied == MP_ARRAY_SIZE(p->shm_names))
+            p->shm_redraw_at = mp_time_ns() + TERMINAL_POLL_NS;
         return 0; // Backpressure: skip this frame without blocking the clock.
+    }
+    p->shm_redraw_at = 0;
 
     if (ftruncate(p->shm_fd, p->buffer_size) == -1) {
         MP_ERR(vo, "Failed to truncate shared memory object");
@@ -480,6 +492,17 @@ static int query_format(struct vo *vo, int format)
     return mp_sws_supports_formats(p->sws, IMGFMT, format);
 }
 
+#if HAVE_POSIX_SHM
+static bool shm_consumed(const char *name)
+{
+    int fd = shm_open(name, O_RDONLY, 0);
+    if (fd < 0)
+        return errno == ENOENT;
+    close(fd);
+    return false;
+}
+#endif
+
 static int control(struct vo *vo, uint32_t request, void *data)
 {
     if (request == VOCTRL_VO_OPTS_CHANGED) {
@@ -509,6 +532,18 @@ static int control(struct vo *vo, uint32_t request, void *data)
                 return VO_FALSE;
             vo_event(vo, VO_EVENT_RESIZE);
         }
+#if HAVE_POSIX_SHM
+        if (p->shm_redraw_at && mp_time_ns() >= p->shm_redraw_at) {
+            p->shm_redraw_at = mp_time_ns() + TERMINAL_POLL_NS;
+            for (unsigned i = 0; i < MP_ARRAY_SIZE(p->shm_names); i++) {
+                if (shm_consumed(p->shm_names[i])) {
+                    p->shm_redraw_at = 0;
+                    vo->want_redraw = true;
+                    break;
+                }
+            }
+        }
+#endif
         return VO_TRUE;
     }
     if (request == VOCTRL_SET_PANSCAN)
@@ -520,7 +555,7 @@ static void wait_events(struct vo *vo, int64_t until_time_ns)
 {
     // A paused video must resize without waiting for another decoded frame or
     // mouse event. Polling also works when the PTY does not deliver SIGWINCH.
-    vo_wait_default(vo, MPMIN(until_time_ns, mp_time_ns() + MP_TIME_MS_TO_NS(100)));
+    vo_wait_default(vo, MPMIN(until_time_ns, mp_time_ns() + TERMINAL_POLL_NS));
 }
 
 static void uninit(struct vo *vo)
@@ -534,13 +569,10 @@ static void uninit(struct vo *vo)
     int64_t deadline = mp_time_ns() + MP_TIME_MS_TO_NS(200);
     while (p->opts.use_shm) {
         bool pending = false;
-        for (unsigned i = 0; i < 3; ++i) {
-            if (!p->shm_owned[i])
-                continue;
-            int fd = shm_open(p->shm_names[i], O_RDONLY, 0);
-            if (fd >= 0) {
-                close(fd);
+        for (unsigned i = 0; i < MP_ARRAY_SIZE(p->shm_names); ++i) {
+            if (p->shm_owned[i] && !shm_consumed(p->shm_names[i])) {
                 pending = true;
+                break;
             }
         }
         if (!pending || mp_time_ns() >= deadline)

@@ -34,6 +34,9 @@ Version `0.40.0+kilix.10` changes no player code. Its shutdown-drain check now
 compares the frames mpv announced with the bytes the terminal read. Before,
 it read every segment present, including one mpv was still filling; on
 slower machines, such as an RK3399 board, that torn read failed the check.
+Version `0.40.0+kilix.11` adds ALSA fallback for audio playback. If a
+paused resize fills the shared-memory ring, the player redraws at the latest
+size as soon as it observes the terminal release a slot.
 
 The package also installs `kilix-video FILE`, the matching Kilix launcher with
 terminal recovery and a persistent warning/error panel. The first four distinct

@@ -10,6 +10,7 @@
     "Bounded immutable shared-memory ring with terminal unlink acknowledgment",
     "Bounded SGR mouse parsing and letterbox coordinate mapping",
     "Keep RGB and unsubsampled color axes aligned during software scaling",
-    "Drain queued shared-memory frames before bounded exit cleanup"
+    "Drain queued shared-memory frames before bounded exit cleanup",
+    "Redraw a paused terminal frame when a shared-memory slot becomes available"
   ]
 }
